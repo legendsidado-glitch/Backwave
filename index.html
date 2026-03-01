@@ -1,251 +1,550 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Backwave — Local AI Agent</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Backwave — Refined UI</title>
+<!--
+  Backwave — Refined UI Single File
+  - Password: Legend.Backwave.Com
+  - All original functionality preserved:
+    chats, memory, wallet, voice in/out, export/import, /remember, /spend, callExternalLLM hook.
+  - No demo unlock (per your request).
+  - Fully responsive, custom SVG icons, improved settings panel.
+  - Use this file locally (save as backwave.html).
+-->
 <style>
+  /* ==========================
+     Design tokens & variables
+     ========================== */
   :root{
-    --accent:#6c8cff;
-    --bg:#f5f7fb;
-    --surface:#ffffff;
-    --text:#0f1724;
-    --muted:#5b6b7a;
-    --radius:12px;
+    --bg-0: #070812;
+    --bg-1: #0f1724;
+    --surface: rgba(255,255,255,0.03);
+    --glass: rgba(255,255,255,0.04);
+    --muted: #9fb0c9;
+    --accent: #56b3ff;
+    --accent-2: #6c8cff;
+    --text: #e6eef8;
+    --radius: 14px;
+    --glass-blur: 8px;
+    --shadow-1: 0 6px 30px rgba(6,9,14,0.6);
+    --max-width: 1200px;
+    --ease: cubic-bezier(.2,.9,.3,1);
+    --ui-gap: 14px;
+    --sidebar-w: 320px;
+    --mobile-sidebar-h: 84px;
   }
-  [data-theme="dark"]{
-    --bg:#0b1117;
-    --surface:#07101a;
-    --text:#e6eef8;
-    --muted:#9fb0c9;
+
+  /* Light theme override */
+  [data-theme="light"]{
+    --bg-0: #f5f8ff;
+    --bg-1: #eaf1ff;
+    --surface: rgba(255,255,255,0.9);
+    --glass: rgba(255,255,255,0.8);
+    --muted: #53677a;
+    --accent: #3766ff;
+    --accent-2: #4aa3ff;
+    --text: #07101a;
+    --shadow-1: 0 8px 30px rgba(13,38,80,0.08);
   }
+
+  /* Base reset */
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;}
-  body{background:linear-gradient(180deg,var(--bg),#e9f0ff);color:var(--text);display:flex;align-items:stretch}
-  .app{width:100%;max-width:1200px;margin:24px auto;border-radius:14px;padding:0;display:grid;grid-template-columns:280px 1fr;gap:16px}
-  .card{background:var(--surface);border-radius:var(--radius);box-shadow:0 6px 20px rgba(10,20,40,0.08);overflow:hidden}
-  /* Sidebar */
-  .sidebar{padding:14px;display:flex;flex-direction:column;height:80vh}
-  .brand{display:flex;align-items:center;gap:10px;padding:6px 10px}
-  .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#3ab0ff);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
-  .title{font-weight:700}
-  .chats{margin-top:10px;flex:1;overflow:auto;padding-right:6px}
-  .chatItem{padding:8px 10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer}
-  .chatItem:hover{background:rgba(0,0,0,0.03)}
-  .chatItem.active{background:linear-gradient(90deg,var(--accent),#5aa3ff);color:white}
-  .controls{display:flex;gap:6px;margin-top:8px}
-  button{background:var(--accent);border:none;color:white;padding:8px 10px;border-radius:10px;cursor:pointer}
-  .mutedBtn{background:transparent;border:1px solid rgba(90,120,200,0.12);color:var(--text)}
-  /* Main area */
-  .main{display:flex;flex-direction:column;height:80vh}
-  .topBar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(0,0,0,0.04)}
-  .chatArea{flex:1;padding:16px;overflow:auto}
-  .msg{max-width:75%;padding:10px 12px;border-radius:12px;margin-bottom:8px;line-height:1.35}
-  .msg.user{background:linear-gradient(180deg,#e9f0ff,#dbe9ff);margin-left:auto}
-  .msg.agent{background:#f1f5f9}
-  .composer{display:flex;gap:8px;padding:12px;border-top:1px solid rgba(0,0,0,0.04)}
-  textarea{flex:1;min-height:46px;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,0.06);resize:none}
-  .small{font-size:13px;color:var(--muted)}
-  .modalOverlay{position:fixed;inset:0;background:rgba(5,7,10,0.46);display:flex;align-items:center;justify-content:center;z-index:9999}
-  .modal{background:var(--surface);padding:20px;border-radius:12px;min-width:320px;max-width:720px;box-shadow:0 10px 40px rgba(0,0,0,0.3)}
-  .row{display:flex;gap:8px;align-items:center}
-  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
-  .chip{background:rgba(0,0,0,0.05);padding:6px 8px;border-radius:999px;font-size:13px}
-  input[type="text"],select,input[type="number"]{padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.08)}
-  .wallet{padding:12px}
-  .footerNote{font-size:12px;color:var(--muted);padding:6px 12px}
-  .topControls{display:flex;gap:8px;align-items:center}
-  .tiny{font-size:12px;padding:6px 8px;border-radius:8px}
-  .iconBtn{background:transparent;border:none;padding:6px;border-radius:8px;cursor:pointer}
-  .accentBar{height:6px;background:linear-gradient(90deg,var(--accent),#3ab0ff)}
-  .file{display:none}
-  /* small screens */
-  @media (max-width:900px){
-    .app{grid-template-columns:1fr;max-width:960px}
-    .sidebar{display:none}
+  html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background: radial-gradient(1200px 600px at 10% 10%, rgba(86,179,255,0.06), transparent), linear-gradient(180deg,var(--bg-1),var(--bg-0)); color:var(--text); -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;}
+  a{color:inherit}
+  button{font-family:inherit}
+
+  /* App frame */
+  .root{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px;
   }
+  .container{
+    width:100%;
+    max-width:var(--max-width);
+    display:grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+    gap:var(--ui-gap);
+    align-items:stretch;
+  }
+
+  /* Glass card */
+  .card{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-1);
+    backdrop-filter: blur(var(--glass-blur));
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,0.03);
+  }
+
+  /* -------- Sidebar -------- */
+  .sidebar{
+    display:flex;
+    flex-direction:column;
+    min-height:72vh;
+    max-height:82vh;
+    padding:18px;
+  }
+  .brand{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .brand .logo{
+    width:58px;height:58px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+    flex-shrink:0;
+    transform:translateZ(0);
+  }
+  .brand h1{margin:0;font-size:18px;letter-spacing:0.4px}
+  .brand .sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+  /* Search + top controls */
+  .sidebar .searchBar{display:flex;gap:8px;align-items:center;margin:10px 0}
+  .searchBar input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--text)}
+  .iconBtn{background:transparent;border:none;cursor:pointer;padding:8px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}
+  .iconBtn:hover{background:rgba(255,255,255,0.02)}
+
+  /* Chats list */
+  .chatList{flex:1;overflow:auto;padding-right:6px}
+  .chatItem{
+    display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;margin-bottom:8px;cursor:pointer;transition:all .18s var(--ease);
+    border:1px solid transparent;
+  }
+  .chatItem .meta{display:flex;flex-direction:column}
+  .chatItem .title{font-weight:600}
+  .chatItem .subtitle{font-size:12px;color:var(--muted)}
+  .chatItem:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,0,0,0.22); border-color:rgba(255,255,255,0.02)}
+  .chatItem.active{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;box-shadow:0 10px 40px rgba(66,133,244,0.12)}
+  .chatControls{display:flex;gap:8px;margin-top:12px}
+
+  /* Bottom utility */
+  .sidebarFooter{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+  .sidebarFooter .btnRow{display:flex;gap:8px}
+  .tinyBtn{font-size:13px;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text);cursor:pointer}
+
+  /* -------- Main area -------- */
+  .main{
+    display:flex;
+    flex-direction:column;
+    min-height:72vh;
+    max-height:82vh;
+    overflow:hidden;
+  }
+  .top{
+    display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.02);
+    gap:12px;
+  }
+  .top .left{display:flex;gap:12px;align-items:center}
+  .top .right{display:flex;gap:10px;align-items:center}
+  .miniChip{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:13px;color:var(--muted)}
+  .titleLarge{font-weight:700;font-size:18px}
+  .subtle{font-size:13px;color:var(--muted)}
+
+  /* Chat canvas */
+  .canvas{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .messages{flex:1;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:12px}
+  .message{max-width:72%;padding:12px 14px;border-radius:12px;line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,0.24)}
+  .message.agent{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));color:var(--text);border:1px solid rgba(255,255,255,0.02)}
+  .message.user{align-self:flex-end;background:linear-gradient(180deg, rgba(86,179,255,0.12), rgba(86,179,255,0.06));border:1px solid rgba(86,179,255,0.12);color:var(--text)}
+  .metaRow{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin-top:8px}
+
+  /* Composer */
+  .composer{
+    display:flex;align-items:center;gap:10px;padding:12px;border-top:1px solid rgba(255,255,255,0.02);background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent)
+  }
+  .composer textarea{flex:1;min-height:56px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);background:rgba(255,255,255,0.02);color:var(--text);resize:vertical;font-size:14px}
+  .sendBtn{padding:10px 14px;border-radius:12px;border:none;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;font-weight:600;cursor:pointer;box-shadow:0 8px 28px rgba(66,133,244,0.08)}
+  .microBtn{width:48px;height:48px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;background:transparent;cursor:pointer}
+
+  /* Modals - full screen with centered card */
+  .modalOverlay{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(2,6,23,0.6), rgba(2,6,23,0.45));z-index:9999;
+  }
+  .modal{
+    width:720px;max-width:96%;border-radius:12px;padding:18px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);
+    box-shadow:0 20px 80px rgba(0,0,0,0.6);
+  }
+  .modal h3{margin:0 0 8px 0}
+  .formGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+  /* Settings panel layout fits new UI */
+  .settingsRow{display:flex;gap:12px;align-items:center}
+  .colorSwatches{display:flex;gap:8px;align-items:center}
+  .swatch{width:36px;height:36px;border-radius:8px;border:2px solid rgba(255,255,255,0.02);cursor:pointer}
+
+  /* Password gate - redesigned */
+  .pwOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(2,6,23,0.6), rgba(2,6,23,0.45));z-index:99999}
+  .pwCard{width:520px;max-width:96%;padding:20px;border-radius:16px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);box-shadow:0 30px 120px rgba(0,0,0,0.7)}
+  .pwLogo{width:72px;height:72px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:20px}
+  .pwHint{font-size:13px;color:var(--muted);margin-top:8px}
+
+  /* Responsive adjustments */
+  @media (max-width:1024px){
+    :root{--sidebar-w:300px}
+    .container{grid-template-columns: var(--sidebar-w) 1fr;}
+    .pwCard{width:640px}
+  }
+  @media (max-width:820px){
+    .container{grid-template-columns:1fr;gap:12px}
+    .sidebar{order:2;min-height:auto;max-height:none;border-radius:12px;padding:12px;display:flex;flex-direction:row;align-items:center;gap:8px;overflow:auto}
+    .brand{display:flex;flex-direction:column;align-items:flex-start}
+    .chatList{display:flex;gap:8px;flex-direction:row;overflow:auto;padding:0;margin:0}
+    .chatItem{min-width:180px;flex-shrink:0;margin-bottom:0}
+    .main{order:1}
+    .modal{width:92%}
+    .pwCard{width:92%}
+  }
+
+  /* Tiny helper classes used in JS */
+  .hidden{display:none}
+  .mutedText{color:var(--muted);font-size:13px}
+  .kbd{background:rgba(0,0,0,0.18);padding:6px 8px;border-radius:7px;font-size:13px;color:var(--text)}
+
+  /* Subtle animations */
+  .pulse{animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.02);opacity:0.85}100%{transform:scale(1);opacity:1}}
+
+  /* Misc spacing */
+  .mt8{margin-top:8px}
+  .mb6{margin-bottom:6px}
+  .flex{display:flex}
+  .col{display:flex;flex-direction:column}
+  .center{align-items:center;justify-content:center}
+  .gap8{gap:8px}
 </style>
-</head>
-<body data-theme="light">
-<div id="passwordOverlay" class="modalOverlay">
-  <div class="modal" style="width:360px">
-    <h3>Backwave — Secure Access</h3>
-    <p class="small">Enter the access password to unlock Backwave.</p>
-    <div style="margin-top:8px">
-      <input id="pwInput" type="text" placeholder="Password" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd" />
-    </div>
-    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
-      <button id="pwUnlock">Unlock</button>
-      <button id="pwDemo" class="mutedBtn">Demo (no password)</button>
-    </div>
-    <p class="small" style="margin-top:10px">Hint: the password is <code>Legend.Backwave.Com</code></p>
-  </div>
-</div>
 
-<div id="app" class="app" style="display:none">
-  <div class="card sidebar">
-    <div class="brand">
-      <div class="logo">BW</div>
-      <div>
-        <div class="title">Backwave</div>
-        <div class="small">Local agent prototype</div>
-      </div>
-    </div>
-    <div class="chats card" id="chatsList"></div>
-    <div class="controls">
-      <button id="newChatBtn">New Chat</button>
-      <button id="settingsBtn" class="mutedBtn">Settings</button>
-      <button id="walletBtn" class="mutedBtn">Wallet</button>
-    </div>
-    <div style="margin-top:10px">
-      <div class="small">Quick commands</div>
-      <div style="display:flex;gap:6px;margin-top:6px">
-        <button id="exportBtn" class="tiny mutedBtn">Export</button>
-        <button id="importBtn" class="tiny mutedBtn">Import</button>
-        <button id="clearAllBtn" class="tiny mutedBtn">Clear All</button>
-      </div>
-    </div>
-  </div>
+<!-- SVG Icon sprite (custom "tuff" icons) -->
+<svg style="display:none" aria-hidden>
+  <defs>
+    <!-- Logo mark -->
+    <g id="icon-logo">
+      <rect x="0" y="0" rx="6" ry="6" width="100" height="100" fill="white" opacity="0.06"></rect>
+      <path d="M20 80 C40 20,60 20,80 80" stroke="white" stroke-width="6" stroke-linecap="round" fill="none" stroke-opacity="0.9"></path>
+      <circle cx="50" cy="40" r="6" fill="white"></circle>
+    </g>
 
-  <div class="card main">
-    <div class="topBar">
-      <div style="display:flex;flex-direction:column">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="font-weight:700">Backwave</div>
-          <div id="activeChatName" class="small muted"></div>
-          <div id="modeChip" class="chip small">assistant</div>
+    <!-- Chat -->
+    <g id="icon-chat">
+      <rect x="6" y="12" rx="8" ry="8" width="88" height="64" fill="none" stroke="currentColor" stroke-width="8"/>
+      <path d="M24 80 L40 64" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+    </g>
+
+    <!-- Microphone -->
+    <g id="icon-mic">
+      <rect x="28" y="12" rx="12" ry="12" width="44" height="56" fill="none" stroke="currentColor" stroke-width="8"/>
+      <path d="M50 68 v10" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+      <path d="M36 78 a14 8 0 0 0 28 0" stroke="currentColor" stroke-width="8" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- Send -->
+    <g id="icon-send">
+      <path d="M10 50 L85 25 L52 50 L85 75 Z" fill="currentColor" />
+    </g>
+
+    <!-- Settings gear -->
+    <g id="icon-settings">
+      <path d="M50 34 a16 16 0 1 0 0 32 a16 16 0 1 0 0 -32" stroke="currentColor" stroke-width="6" fill="none"/>
+      <path d="M50 10 v10" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+      <path d="M50 90 v-10" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+    </g>
+
+    <!-- Wallet -->
+    <g id="icon-wallet">
+      <rect x="8" y="18" rx="10" ry="10" width="84" height="56" fill="none" stroke="currentColor" stroke-width="8"/>
+      <circle cx="70" cy="46" r="6" fill="currentColor"/>
+    </g>
+
+    <!-- Export -->
+    <g id="icon-export">
+      <path d="M20 64 L50 34 L80 64" stroke="currentColor" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="18" y="70" rx="6" ry="6" width="64" height="12" fill="currentColor" opacity="0.06"/>
+    </g>
+
+    <!-- Import -->
+    <g id="icon-import">
+      <path d="M20 34 L50 64 L80 34" stroke="currentColor" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="18" y="18" rx="6" ry="6" width="64" height="12" fill="currentColor" opacity="0.06"/>
+    </g>
+
+    <!-- Trash -->
+    <g id="icon-trash">
+      <rect x="20" y="32" rx="6" ry="6" width="60" height="46" fill="none" stroke="currentColor" stroke-width="8"/>
+      <path d="M34 28 L66 28" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+      <path d="M40 28 v-6 a6 6 0 0 1 6 -6 h8 a6 6 0 0 1 6 6 v6" stroke="currentColor" stroke-width="8" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- Wallet send -->
+    <g id="icon-gift">
+      <rect x="18" y="28" rx="8" ry="8" width="64" height="44" fill="none" stroke="currentColor" stroke-width="6"/>
+      <path d="M18 36 h64" stroke="currentColor" stroke-width="6"/>
+      <path d="M50 28 v52" stroke="currentColor" stroke-width="6"/>
+    </g>
+
+    <!-- Voice On -->
+    <g id="icon-voice-on">
+      <path d="M28 36 v28 a8 8 0 0 0 8 8 h4 a8 8 0 0 0 8 -8 v-28" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M60 40 c6 8 6 16 0 24" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- Voice Off -->
+    <g id="icon-voice-off">
+      <path d="M28 36 v28 a8 8 0 0 0 8 8 h4 a8 8 0 0 0 8 -8 v-28" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M30 30 L74 74" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+    </g>
+  </defs>
+</svg>
+
+<body data-theme="dark">
+<div class="root">
+  <div class="container">
+
+    <!-- SIDEBAR -->
+    <aside class="card sidebar" aria-label="Sidebar">
+      <div class="brand">
+        <div class="logo" aria-hidden>
+          <svg viewBox="0 0 100 100" width="34" height="34" aria-hidden>
+            <use href="#icon-logo"></use>
+          </svg>
         </div>
-        <div class="small">Chat with Backwave — voice & text. Saved locally.</div>
+        <div>
+          <h1>Backwave</h1>
+          <div class="sub">Secure local agent</div>
+        </div>
       </div>
-      <div class="topControls">
-        <div class="small">Balance: <strong id="balanceDisplay">0</strong> ⸱</div>
-        <button id="giveMoneyBtn" class="mutedBtn tiny">Give Money</button>
-        <button id="voiceToggle" class="mutedBtn tiny">Voice ON</button>
-        <button id="helpBtn" class="mutedBtn tiny">Help</button>
+
+      <div class="searchBar">
+        <input id="searchChats" placeholder="Search chats or commands..." />
+        <button class="iconBtn" id="newChatBtn_side" title="New chat">
+          <svg width="20" height="20" viewBox="0 0 100 100"><path d="M50 12 v76 M12 50 h76" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>
+        </button>
       </div>
-    </div>
 
-    <div id="chatArea" class="chatArea"></div>
+      <div class="chatList" id="chatsList"></div>
 
-    <div class="composer">
-      <button id="micBtn" class="iconBtn" title="Speak (if supported)">🎤</button>
-      <textarea id="messageInput" placeholder="Type a message, or try commands like: /remember, /spend 10 buy coffee"></textarea>
-      <button id="sendBtn">Send</button>
-    </div>
-    <div class="footerNote">Tip: say "remember X is Y" or use "/remember key=value" to teach Backwave things. Use "/spend AMT action" to instruct spending from wallet.</div>
+      <div class="sidebarFooter">
+        <div class="btnRow">
+          <button id="exportBtn_side" class="tinyBtn"><svg width="16" height="16" viewBox="0 0 100 100"><use href="#icon-export"/></svg> Export</button>
+          <button id="importBtn_side" class="tinyBtn"><svg width="16" height="16" viewBox="0 0 100 100"><use href="#icon-import"/></svg> Import</button>
+        </div>
+        <div class="btnRow">
+          <button id="settingsBtn_side" class="tinyBtn"><svg width="16" height="16" viewBox="0 0 100 100"><use href="#icon-settings"/></svg> Settings</button>
+          <button id="walletBtn_side" class="tinyBtn"><svg width="16" height="16" viewBox="0 0 100 100"><use href="#icon-wallet"/></svg> Wallet</button>
+        </div>
+        <div class="mutedText">Tip: Tap a chat to start. Use <span class="kbd">/remember</span> and <span class="kbd">/spend</span>.</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CARD -->
+    <main class="card main" role="main">
+      <div class="top">
+        <div class="left">
+          <div style="display:flex;flex-direction:column">
+            <div class="titleLarge">Backwave</div>
+            <div class="subtle">Secure local agent — saved in your browser</div>
+          </div>
+          <div style="margin-left:12px" id="modeChip" class="miniChip">assistant</div>
+        </div>
+
+        <div class="right">
+          <div class="miniChip">Balance: <strong id="balanceDisplay">0</strong></div>
+          <button id="giveMoneyBtn" class="iconBtn" title="Give money">
+            <svg width="18" height="18" viewBox="0 0 100 100"><use href="#icon-gift"/></svg>
+          </button>
+          <button id="voiceToggle" class="iconBtn" title="Toggle voice">
+            <svg id="voiceIcon" width="18" height="18" viewBox="0 0 100 100"><use href="#icon-voice-on"/></svg>
+          </button>
+          <button id="helpBtn" class="iconBtn" title="Help">
+            <svg width="18" height="18" viewBox="0 0 100 100"><use href="#icon-chat"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Chat canvas -->
+      <section class="canvas">
+        <div id="chatArea" class="messages" aria-live="polite"></div>
+
+        <!-- Composer -->
+        <div class="composer">
+          <button id="micBtn" class="microBtn" title="Speak">
+            <svg width="20" height="20" viewBox="0 0 100 100"><use href="#icon-mic"/></svg>
+          </button>
+          <textarea id="messageInput" placeholder="Type or speak... (Enter to send, Shift+Enter new line)"></textarea>
+          <button id="sendBtn" class="sendBtn">
+            <svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle;margin-right:8px"><use href="#icon-send"/></svg> Send
+          </button>
+        </div>
+      </section>
+    </main>
   </div>
 </div>
 
-<!-- Settings modal (hidden initially) -->
-<div id="settingsModal" class="modalOverlay" style="display:none">
-  <div class="modal">
-    <h3>Settings</h3>
-    <div class="field">
-      <label class="small">Theme</label>
-      <select id="themeSelect">
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
-    </div>
-    <div class="field">
-      <label class="small">Accent color</label>
-      <input id="accentColor" type="color" value="#6c8cff" />
-    </div>
-    <div class="field">
-      <label class="small">Voice</label>
-      <select id="voiceSelect"></select>
-    </div>
-    <div class="row" style="gap:12px">
-      <div class="field" style="flex:1">
-        <label class="small">Rate</label>
-        <input id="rate" type="number" min="0.5" max="2" step="0.1" value="1" />
+<!-- Password overlay (improved, no demo) -->
+<div id="passwordOverlay" class="pwOverlay" role="dialog" aria-modal="true" aria-label="Secure access">
+  <div class="pwCard">
+    <div style="display:flex;gap:14px;align-items:center">
+      <div class="pwLogo" aria-hidden>
+        <svg width="48" height="48" viewBox="0 0 100 100"><use href="#icon-logo"/></svg>
       </div>
-      <div class="field" style="flex:1">
-        <label class="small">Pitch</label>
-        <input id="pitch" type="number" min="0" max="2" step="0.1" value="1" />
+      <div>
+        <h2 style="margin:0">Welcome to Backwave</h2>
+        <div class="pwHint">Enter the secure access password to unlock your agent.</div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-      <button id="saveSettings">Save</button>
-      <button id="cancelSettings" class="mutedBtn">Cancel</button>
+
+    <div style="margin-top:18px">
+      <label class="mutedText">Password</label>
+      <input id="pwInput" type="password" placeholder="••••••••" style="width:100%;padding:12px;border-radius:10px;margin-top:8px;border:1px solid rgba(255,255,255,0.03);background:rgba(255,255,255,0.02);color:var(--text)"/>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button id="pwUnlock" style="padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;font-weight:600">Unlock</button>
+      </div>
+      <div style="margin-top:10px" class="mutedText">Password hint: <code>Legend.Backwave.Com</code></div>
     </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div id="settingsModal" class="modalOverlay" aria-hidden>
+  <div class="modal" role="dialog" aria-label="Settings">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Settings</h3>
+      <div class="mutedText">Your settings are stored locally</div>
+    </div>
+
+    <div style="margin-top:10px" class="formGrid">
+      <div>
+        <label class="mutedText">Theme</label>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="tinyBtn" data-theme-val="dark">Dark</button>
+          <button class="tinyBtn" data-theme-val="light">Light</button>
+        </div>
+
+        <div style="margin-top:14px">
+          <label class="mutedText">Accent</label>
+          <div class="colorSwatches mt8">
+            <div class="swatch" data-color="#56b3ff" style="background:#56b3ff"></div>
+            <div class="swatch" data-color="#6c8cff" style="background:#6c8cff"></div>
+            <div class="swatch" data-color="#4dd2a8" style="background:#4dd2a8"></div>
+            <div class="swatch" data-color="#ffb86b" style="background:#ffb86b"></div>
+            <div class="swatch" data-color="#f97575" style="background:#f97575"></div>
+            <input id="accentColor" type="color" value="#56b3ff" style="margin-left:8px; width:46px;height:36px;border-radius:8px;border:0;padding:0"/>
+          </div>
+        </div>
+
+      </div>
+
+      <div>
+        <label class="mutedText">Voice & Speech</label>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+          <select id="voiceSelect" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)"></select>
+          <div style="display:flex;gap:8px">
+            <input id="rate" type="number" min="0.5" max="2" step="0.1" value="1" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);flex:1" />
+            <input id="pitch" type="number" min="0" max="2" step="0.1" value="1" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);flex:1" />
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="saveSettings" class="tinyBtn">Save</button>
+            <button id="cancelSettings" class="tinyBtn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <!-- Wallet modal -->
-<div id="walletModal" class="modalOverlay" style="display:none">
+<div id="walletModal" class="modalOverlay" aria-hidden>
   <div class="modal">
     <h3>Wallet</h3>
-    <div class="wallet">
-      <div class="small">Current balance: <strong id="walletBalance">0</strong></div>
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <input id="addAmount" type="number" placeholder="Amount" min="1" />
-        <input id="note" type="text" placeholder="Note (what it's for)" />
-        <button id="addFundsBtn">Add Funds</button>
-      </div>
-      <div style="margin-top:10px">
-        <label class="small">Give money to agent to perform an action:</label>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <input id="giveAmount" type="number" placeholder="Amount" min="1" />
-          <input id="giveAction" type="text" placeholder='Action, e.g. "buy logo design"' />
-          <button id="giveToAgentBtn">Give</button>
-        </div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="mutedText">Balance: <strong id="walletBalance">0</strong></div>
+      <div class="mutedText">Transactions: <span id="txCount">0</span></div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <input id="addAmount" type="number" placeholder="Amount" min="1" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);flex:1"/>
+      <input id="note" type="text" placeholder="Note" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);flex:2"/>
+      <button id="addFundsBtn" class="tinyBtn">Add</button>
+    </div>
+
+    <div style="margin-top:12px">
+      <label class="mutedText">Give money to agent</label>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="giveAmount" type="number" placeholder="Amount" min="1" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);flex:1"/>
+        <input id="giveAction" type="text" placeholder='Action, e.g. "buy logo design"' style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);flex:2"/>
+        <button id="giveToAgentBtn" class="tinyBtn">Give</button>
       </div>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-      <button id="closeWallet">Close</button>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button id="closeWallet" class="tinyBtn">Close</button>
     </div>
   </div>
 </div>
 
 <!-- Help modal -->
-<div id="helpModal" class="modalOverlay" style="display:none">
+<div id="helpModal" class="modalOverlay" aria-hidden>
   <div class="modal">
-    <h3>Backwave — Quick Help</h3>
+    <h3>Quick Help</h3>
+    <p class="mutedText">All data is local to your browser. For real LLM responses, connect an API at the callExternalLLM() hook.</p>
     <ul>
-      <li><strong>Remember:</strong> Say "remember X is Y" or use "/remember key=value". Backwave saves it to memory.</li>
-      <li><strong>Spend:</strong> Use "/spend 10 buy art" to instruct spending from wallet (simulated).</li>
-      <li><strong>Chats:</strong> Create multiple chats to separate tasks and personas.</li>
-      <li><strong>Voice:</strong> Toggle voice replies in the top bar, change voice in Settings.</li>
-      <li><strong>External LLM:</strong> There's a hook `callExternalLLM()` in the code where you can plug in an API call.</li>
+      <li>Use <span class="kbd">/remember key=value</span> to store facts.</li>
+      <li>Use <span class="kbd">/spend AMOUNT action</span> to spend from the wallet (simulated).</li>
+      <li>Create multiple chats to keep tasks separate.</li>
     </ul>
-    <div style="display:flex;justify-content:flex-end;margin-top:10px">
-      <button id="closeHelp">Close</button>
+    <div style="display:flex;justify-content:flex-end">
+      <button id="closeHelp" class="tinyBtn">Close</button>
     </div>
   </div>
 </div>
 
 <script>
-/*
-  Backwave — client-only prototype
-  - Persistent storage keys:
-    backwave_chats, backwave_settings, backwave_memory, backwave_wallet
-  - Password: Legend.Backwave.Com
-  - Hook external LLM by editing callExternalLLM()
-*/
+/* ============================
+   Backwave — Refined UI JS
+   Preserves original logic & features,
+   but with improved UI wiring.
+   ============================ */
 
-// ---------- Utilities ----------
+/* ---------------------------
+   Utilities & small helpers
+   --------------------------- */
 const randId = (n=6)=>Math.random().toString(36).slice(2,2+n);
 const nowIso = ()=>new Date().toISOString();
-function qs(id){return document.getElementById(id)}
+const qs = (id)=>document.getElementById(id);
+const el = (t,attrs={},children='')=>{const n=document.createElement(t); for(const k in attrs) n.setAttribute(k,attrs[k]); if(children) n.innerHTML=children; return n;}
+function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
+function safeHtml(s){ return (s||'').toString().replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
 
-// ---------- Storage helpers ----------
+/* ---------------------------
+   Storage wrapper (same keys)
+   --------------------------- */
 const STORAGE = {
-  get(k, def){try{const v=localStorage.getItem(k); return v?JSON.parse(v):def}catch(e){return def}},
-  set(k,v){localStorage.setItem(k,JSON.stringify(v))}
+  get(k,def){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; }catch(e){ return def; } },
+  set(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 };
 
-// ---------- Default data ----------
+/* ---------------------------
+   Default / initial data
+   --------------------------- */
 const DEFAULTS = {
-  chats: [{id:'c-'+randId(),name:'General',messages:[
-    {from:'agent',text:'Hello — I am Backwave. Ask me to remember things or try the wallet (click Wallet).',time:nowIso()}
-  ],mode:'assistant'}],
-  settings: {theme:'light',accent:'#6c8cff',voiceIndex:0,rate:1,pitch:1,voiceOn:true},
-  memory: {}, // key->value map
-  wallet: {balance:0,transactions:[]}
+  chats: [{id:'c-'+randId(), name:'General', mode:'assistant', messages:[
+    {from:'agent', text:'Welcome to Backwave — refined. Type or speak to begin.', time: nowIso()}
+  ]}],
+  settings: { theme:'dark', accent:'#56b3ff', voiceIndex:0, rate:1, pitch:1, voiceOn:true },
+  memory: {},
+  wallet: { balance:0, transactions:[] }
 };
 
-// ---------- App state ----------
+/* ---------------------------
+   App state
+   --------------------------- */
 let state = {
   chats: STORAGE.get('backwave_chats', DEFAULTS.chats),
   settings: STORAGE.get('backwave_settings', DEFAULTS.settings),
@@ -254,289 +553,262 @@ let state = {
   activeChatId: null,
   voices: [],
   recognition: null,
-  listening:false
+  listening: false
 };
 
-// ---------- DOM references ----------
-const appEl = qs('app');
+/* ---------------------------
+   DOM refs (new layout)
+   --------------------------- */
 const chatsList = qs('chatsList');
 const chatArea = qs('chatArea');
 const messageInput = qs('messageInput');
 const sendBtn = qs('sendBtn');
-const newChatBtn = qs('newChatBtn');
-const settingsBtn = qs('settingsBtn');
+const newChatBtn = qs('newChatBtn_side');
+const settingsBtn = qs('settingsBtn_side');
 const settingsModal = qs('settingsModal');
 const walletModal = qs('walletModal');
-const settingsSelect = qs('themeSelect');
-const accentColor = qs('accentColor');
-const voiceSelect = qs('voiceSelect');
-const rateInput = qs('rate');
-const pitchInput = qs('pitch');
-const saveSettingsBtn = qs('saveSettings');
-const cancelSettingsBtn = qs('cancelSettings');
+const helpModal = qs('helpModal');
+
 const pwOverlay = qs('passwordOverlay');
 const pwInput = qs('pwInput');
 const pwUnlock = qs('pwUnlock');
-const pwDemo = qs('pwDemo');
+
+const exportBtn = qs('exportBtn_side');
+const importBtn = qs('importBtn_side');
+const walletBtn = qs('walletBtn_side');
+const giveMoneyBtn = qs('giveMoneyBtn');
+const voiceToggle = qs('voiceToggle');
+const voiceIcon = qs('voiceIcon');
+
 const balanceDisplay = qs('balanceDisplay');
 const walletBalance = qs('walletBalance');
-const addFundsBtn = qs('addFundsBtn');
+const txCount = qs('txCount');
+
 const addAmount = qs('addAmount');
 const noteInput = qs('note');
+const addFundsBtn = qs('addFundsBtn');
 const giveAmount = qs('giveAmount');
 const giveAction = qs('giveAction');
 const giveToAgentBtn = qs('giveToAgentBtn');
-const giveMoneyBtn = qs('giveMoneyBtn');
-const walletBtn = qs('walletBtn');
-const micBtn = qs('micBtn');
-const voiceToggle = qs('voiceToggle');
-const exportBtn = qs('exportBtn');
-const importBtn = qs('importBtn');
-const clearAllBtn = qs('clearAllBtn');
-const helpBtn = qs('helpBtn');
-const helpModal = qs('helpModal');
-const closeHelp = qs('closeHelp');
-const activeChatName = qs('activeChatName');
-const modeChip = qs('modeChip');
-const settingsVoiceSelect = voiceSelect;
+const closeWallet = qs('closeWallet');
 
-// ---------- Init UI ----------
-function applySettingsToDOM(){
-  document.body.setAttribute('data-theme', state.settings.theme);
-  document.documentElement.style.setProperty('--accent', state.settings.accent);
-  qs('balanceDisplay').innerText = state.wallet.balance;
-  qs('walletBalance').innerText = state.wallet.balance;
-  settingsSelect.value = state.settings.theme;
-  accentColor.value = state.settings.accent || '#6c8cff';
-  rateInput.value = state.settings.rate || 1;
-  pitchInput.value = state.settings.pitch || 1;
-  voiceToggle.innerText = state.settings.voiceOn ? 'Voice ON' : 'Voice OFF';
-}
+const micBtn = qs('micBtn');
+const sendButton = qs('sendBtn');
+
+const newChatSearch = qs('searchChats');
+
+const modeChip = qs('modeChip');
+
+const voiceSelect = qs('voiceSelect');
+const rateInput = qs('rate');
+const pitchInput = qs('pitch');
+const accentColorInput = qs('accentColor');
+const saveSettingsBtn = qs('saveSettings');
+const cancelSettingsBtn = qs('cancelSettings');
+
+const helpBtnRef = qs('helpBtn');
+const closeHelp = qs('closeHelp');
+
+/* ---------------------------
+   Helpers for state & UI
+   --------------------------- */
 function saveAll(){
   STORAGE.set('backwave_chats', state.chats);
   STORAGE.set('backwave_settings', state.settings);
   STORAGE.set('backwave_memory', state.memory);
   STORAGE.set('backwave_wallet', state.wallet);
 }
+
 function ensureActiveChat(){
-  if(!state.activeChatId) state.activeChatId = state.chats[0]?.id;
-  if(!state.activeChatId && state.chats.length>0) state.activeChatId = state.chats[0].id;
+  if(!state.activeChatId){
+    if(state.chats.length>0) state.activeChatId = state.chats[0].id;
+    else {
+      const id = 'c-'+randId();
+      const cc = { id, name:'General', mode:'assistant', messages:[{from:'agent',text:'Fresh chat',time:nowIso()}] };
+      state.chats.unshift(cc); state.activeChatId = id;
+    }
+  }
 }
 function getActiveChat(){ return state.chats.find(c=>c.id===state.activeChatId) || null; }
 
-// ---------- Render ----------
-function renderChats(){
+/* ---------------------------
+   Rendering UI (preserve behavior)
+   --------------------------- */
+function renderChats(filter=''){
   chatsList.innerHTML = '';
+  const q = (filter||'').trim().toLowerCase();
   state.chats.forEach(c=>{
-    const el = document.createElement('div');
-    el.className = 'chatItem' + (c.id===state.activeChatId ? ' active' : '');
-    el.onclick = ()=>{ state.activeChatId=c.id; render(); }
-    el.innerHTML = `<div style="display:flex;flex-direction:column">
-      <div style="font-weight:600">${c.name}</div>
-      <div class="small" style="opacity:0.8">${c.mode || 'assistant'}</div>
-    </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end">
-      <div style="font-size:12px;color:var(--muted)">${c.messages.length}</div>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <button title="Rename" class="mutedBtn tiny" onclick="renameChat(event,'${c.id}')">✏️</button>
-        <button title="Delete" class="mutedBtn tiny" onclick="deleteChat(event,'${c.id}')">🗑️</button>
+    if(q && !c.name.toLowerCase().includes(q) && !c.messages.some(m=>m.text.toLowerCase().includes(q))) return;
+    const div = document.createElement('div');
+    div.className = 'chatItem' + (c.id===state.activeChatId ? ' active' : '');
+    div.onclick = ()=>{ state.activeChatId = c.id; render(); };
+    div.innerHTML = `
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:white;font-weight:700">
+          ${c.name.slice(0,1).toUpperCase()}
+        </div>
+        <div class="meta">
+          <div class="title">${safeHtml(c.name)}</div>
+          <div class="subtitle">${safeHtml(c.mode || 'assistant')} • ${c.messages.length} messages</div>
+        </div>
       </div>
-    </div>`;
-    chatsList.appendChild(el);
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="iconBtn" title="Rename" onclick="renameChat(event,'${c.id}')">
+          <svg width="18" height="18" viewBox="0 0 100 100"><path d="M12 76 L88 24" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="iconBtn" title="Delete" onclick="deleteChat(event,'${c.id}')">
+          <svg width="18" height="18" viewBox="0 0 100 100"><use href="#icon-trash"/></svg>
+        </button>
+      </div>`;
+    chatsList.appendChild(div);
   });
 }
-function renderChatArea(){
-  const chat = getActiveChat();
-  activeChatName.innerText = chat ? ' — ' + chat.name : '';
-  modeChip.innerText = chat?.mode || 'assistant';
+
+function renderMessages(){
   chatArea.innerHTML = '';
+  const chat = getActiveChat();
   if(!chat){
-    chatArea.innerHTML = `<div style="padding:20px">No chat. Create one.</div>`;
+    chatArea.innerHTML = `<div class="mutedText">No chat selected.</div>`;
     return;
   }
+  modeChip.innerText = chat.mode || 'assistant';
   chat.messages.forEach(m=>{
-    const mEl = document.createElement('div');
-    mEl.className = 'msg ' + (m.from==='user' ? 'user' : 'agent');
-    mEl.innerHTML = `<div style="font-size:13px">${escapeHtml(m.text)}</div>
-      <div class="small" style="margin-top:6px">${new Date(m.time).toLocaleString()}</div>`;
-    chatArea.appendChild(mEl);
+    const d = document.createElement('div');
+    d.className = 'message ' + (m.from==='user' ? 'user' : 'agent');
+    d.innerHTML = `<div>${safeHtml(m.text)}</div><div class="metaRow mutedText">${new Date(m.time).toLocaleString()}</div>`;
+    chatArea.appendChild(d);
   });
   chatArea.scrollTop = chatArea.scrollHeight;
 }
-function render(){
-  renderChats();
-  renderChatArea();
-  applySettingsToDOM();
-  saveAll();
-}
 
-// ---------- Chat controls ----------
-function newChat(){
+/* ---------------------------
+   Chat operations
+   --------------------------- */
+function newChat(name){
   const id = 'c-'+randId();
-  const newC = {id,name:'Chat '+(state.chats.length+1),messages:[{from:'agent',text:'New chat started. What can I do for you?',time:nowIso()}],mode:'assistant'};
-  state.chats.unshift(newC);
-  state.activeChatId = newC.id;
+  const c = { id, name: name || 'Chat '+(state.chats.length+1), mode:'assistant', messages:[{from:'agent',text:'New chat',time:nowIso()}] };
+  state.chats.unshift(c);
+  state.activeChatId = id;
+  saveAll();
   render();
 }
 function renameChat(ev,id){
   ev.stopPropagation();
-  const newName = prompt('New chat name?') || '';
-  if(!newName) return;
-  const c = state.chats.find(x=>x.id===id);
-  if(c) c.name = newName;
-  render();
+  const newName = prompt('Chat name:', state.chats.find(x=>x.id===id)?.name || '');
+  if(newName!==null && newName.trim()!==''){
+    const c = state.chats.find(x=>x.id===id);
+    c.name = newName.trim();
+    saveAll(); render();
+  }
 }
 function deleteChat(ev,id){
   ev.stopPropagation();
   if(!confirm('Delete this chat?')) return;
   state.chats = state.chats.filter(x=>x.id!==id);
-  if(state.chats.length===0) newChat();
+  if(state.chats.length===0) newChat('General');
   state.activeChatId = state.chats[0].id;
-  render();
+  saveAll(); render();
 }
 
-// ---------- Message flow & agent ----------
-// Escape for safety display
-function escapeHtml(s){ return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+/* ---------------------------
+   Message sending & agent
+   (keeps existing command handling)
+   --------------------------- */
 
-// Append message to active chat
-function appendMessage(from,text,opts={}){
+function appendMessage(from, text, opts={}){
   const chat = getActiveChat();
   if(!chat) return;
-  chat.messages.push({from, text, time: nowIso(), meta: opts});
-  render();
+  chat.messages.push({ from, text, time: nowIso(), meta: opts });
+  saveAll();
+  renderMessages();
 }
 
-// Very small local "agent" logic.
-// This is where you can add more sophisticated behaviors or integrate an LLM.
-async function agentRespond(userText){
-  // Basic command parsing
-  userText = userText.trim();
-  // commands starting with /
-  if(userText.startsWith('/')){
-    const parts = userText.slice(1).split(' ');
-    const cmd = parts[0].toLowerCase();
-    if(cmd==='remember'){
-      // format: /remember key=value
-      const payload = parts.slice(1).join(' ');
-      const [k,v] = payload.split('=').map(s=>s && s.trim());
-      if(k && v){
-        state.memory[k] = v;
-        saveAll();
-        return `Got it — I will remember ${k} = ${v}.`;
-      } else {
-        return 'Usage: /remember key=value';
-      }
-    } else if(cmd==='spend'){
-      // /spend 10 do something
-      const amt = Number(parts[1] || 0);
-      const action = parts.slice(2).join(' ') || 'an action';
-      if(isNaN(amt) || amt<=0) return 'Invalid amount.';
-      if(state.wallet.balance < amt) return `Insufficient funds. Balance ${state.wallet.balance}.`;
-      state.wallet.balance -= amt;
-      state.wallet.transactions.push({time:nowIso(),type:'spend',amount:amt,action});
-      saveAll();
-      return `Spent ${amt} on "${action}". New balance: ${state.wallet.balance}.`;
-    } else {
-      return `Unknown command: ${cmd}`;
-    }
-  }
-
-  // "remember X is Y" natural language teaching
-  const remMatch = userText.match(/\bremember\s+(.+?)\s+(is|=)\s+(.+)/i);
-  if(remMatch){
-    const key = remMatch[1].trim();
-    const val = remMatch[3].trim();
-    state.memory[key]=val;
-    saveAll();
-    return `Saved "${key}" → "${val}" in memory.`;
-  }
-
-  // simple memory retrieval
-  const askMem = userText.match(/(what|who|tell me).*(about|is)\s+(.+)\?/i);
-  if(askMem){
-    const key = askMem[3].trim();
-    if(state.memory[key]) return `I remember: ${key} = ${state.memory[key]}.`;
-    return `I don't have any memory about "${key}". You can tell me: "remember ${key} is ..."`;
-  }
-
-  // check wallet queries
-  if(/balance|wallet|money/i.test(userText)){
-    return `Current balance: ${state.wallet.balance}. Transactions: ${state.wallet.transactions.length}.`;
-  }
-
-  // Persona-based shorter/longer replies
-  const chat = getActiveChat();
-  const mode = chat?.mode || 'assistant';
-
-  // Hook for external LLM (if you wire one)
-  const external = await callExternalLLM(userText, {mode, memory: state.memory});
-  if(typeof external === 'string'){
-    return external;
-  }
-
-  // Fallback simple local answer
-  if(mode==='creative'){
-    return `🌊 Backwave (creative): I hear you. You said "${userText}". Imagine we turn that into a bright idea — you could try: "${userText} + remix".`;
-  } else if(mode==='concise'){
-    return `Backwave: ${userText.length>120 ? userText.slice(0,120)+'…' : userText}`;
-  } else {
-    // assistant: try to answer nicely using memory snippets
-    // If any memory key matches words in userText, incorporate it.
-    for(const k of Object.keys(state.memory)){
-      if(userText.toLowerCase().includes(k.toLowerCase())){
-        return `You asked about ${k}. I have: ${state.memory[k]}.`;
-      }
-    }
-    // otherwise small helpful echo
-    return `I got: "${userText}". Explain more or use /remember to teach me facts.`;
-  }
-}
-
-// Placeholder — integrate real LLM here if you want.
-// Return a string to be used as the agent reply, or return null to let local fallback run.
-async function callExternalLLM(prompt, opts){
-  // Example stub: if you want to plug in OpenAI, replace this function's body
-  // with a fetch() to your server / openai endpoint and return the assistant text.
-  // Do NOT put API keys directly into client-side code for production.
-  //
-  // Return null to fall back to built-in logic.
-  return null;
-}
-
-// ---------- Send / receive ----------
 async function handleSend(){
   const text = messageInput.value.trim();
   if(!text) return;
   appendMessage('user', text);
   messageInput.value = '';
-  // show typing...
-  appendMessage('agent', '…'); // temporary placeholder
-  // remove placeholder after response
+  // show typing placeholder
+  appendMessage('agent', '…');
   const tmpIndex = getActiveChat().messages.length - 1;
   const reply = await agentRespond(text);
-  // replace temporary
+  // remove placeholder
   const chat = getActiveChat();
   if(chat && chat.messages[tmpIndex] && chat.messages[tmpIndex].from==='agent'){
-    chat.messages.splice(tmpIndex,1); // remove placeholder
+    chat.messages.splice(tmpIndex,1);
   }
-  appendMessage('agent', reply);
-  if(state.settings.voiceOn) speakText(reply);
+  appendMessage('agent', reply || '…');
+  if(state.settings.voiceOn) speakText(reply || '…');
   saveAll();
 }
 
-// ---------- Voice synthesis & recognition ----------
+/* Agent logic (kept from previous version) */
+async function agentRespond(userText){
+  userText = (userText||'').trim();
+  // Slash commands
+  if(userText.startsWith('/')){
+    const parts = userText.slice(1).split(' ');
+    const cmd = parts[0].toLowerCase();
+    if(cmd==='remember'){
+      const payload = parts.slice(1).join(' ');
+      const [k,v] = payload.split('=').map(s=>s && s.trim());
+      if(k && v){ state.memory[k]=v; saveAll(); return `Remembered ${k} → ${v}.`; } else return 'Usage: /remember key=value';
+    } else if(cmd==='spend'){
+      const amt = Number(parts[1]||0); const action = parts.slice(2).join(' ')||'an action';
+      if(isNaN(amt) || amt<=0) return 'Invalid amount.';
+      if(state.wallet.balance < amt) return `Insufficient funds. Balance ${state.wallet.balance}.`;
+      state.wallet.balance -= amt; state.wallet.transactions.push({time:nowIso(),type:'spend',amount:amt,action}); saveAll();
+      return `Spent ${amt} on "${action}". New balance: ${state.wallet.balance}.`;
+    } else return `Unknown command: ${cmd}`;
+  }
+  // natural "remember x is y"
+  const remMatch = userText.match(/\bremember\s+(.+?)\s+(is|=)\s+(.+)/i);
+  if(remMatch){ const key = remMatch[1].trim(), val = remMatch[3].trim(); state.memory[key]=val; saveAll(); return `Saved "${key}" → "${val}" in memory.`; }
+
+  // memory retrieval
+  const askMem = userText.match(/(what|who|tell me).*(about|is)\s+(.+)\?/i);
+  if(askMem){ const key = askMem[3].trim(); if(state.memory[key]) return `I remember: ${key} = ${state.memory[key]}.`; return `I don't have any memory about "${key}".`;}
+
+  // wallet query
+  if(/balance|wallet|money/i.test(userText)) return `Current balance: ${state.wallet.balance}. Transactions: ${state.wallet.transactions.length}.`;
+
+  // persona mode
+  const chat = getActiveChat(); const mode = chat?.mode || 'assistant';
+  // try external LLM hook
+  const external = await callExternalLLM(userText, {mode, memory: state.memory});
+  if(typeof external === 'string') return external;
+
+  // local fallbacks
+  if(mode==='creative') return `🌊 Backwave (creative): here's a creative spin on "${userText}" — imagine remixing it with color and motion.`;
+  if(mode==='concise') return `Backwave: ${userText.length>120 ? userText.slice(0,120) + '…' : userText}`;
+  // assistant mode incorporate memory
+  for(const k of Object.keys(state.memory)){ if(userText.toLowerCase().includes(k.toLowerCase())) return `You asked about ${k}. I have: ${state.memory[k]}.`; }
+  return `I understood: "${userText}". Ask me to remember or /spend to simulate wallet actions.`;
+}
+
+/* Placeholder hook: replace to connect to real LLM service (server side recommended) */
+async function callExternalLLM(prompt, opts){
+  // Return null to use local fallback.
+  return null;
+}
+
+/* ---------------------------
+   Voice (TTS) and STT
+   --------------------------- */
 function populateVoices(){
-  state.voices = speechSynthesis.getVoices();
+  state.voices = speechSynthesis.getVoices() || [];
   voiceSelect.innerHTML = '';
   state.voices.forEach((v,i)=>{
     const opt = document.createElement('option');
     opt.value = i;
-    opt.innerText = `${v.name} (${v.lang})${v.default ? ' — default' : ''}`;
+    opt.textContent = `${v.name} (${v.lang})${v.default ? ' — default' : ''}`;
     voiceSelect.appendChild(opt);
   });
+  // restore preferred
   if(state.settings.voiceIndex) voiceSelect.value = state.settings.voiceIndex;
 }
+if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = populateVoices;
+
 function speakText(text){
   try{
     const u = new SpeechSynthesisUtterance(text);
@@ -545,221 +817,209 @@ function speakText(text){
     u.rate = Number(rateInput.value || state.settings.rate || 1);
     u.pitch = Number(pitchInput.value || state.settings.pitch || 1);
     speechSynthesis.speak(u);
-  }catch(e){
-    console.warn('TTS failed',e);
-  }
+  }catch(e){ console.warn('TTS error', e); }
 }
+
+/* SpeechRecognition setup */
 function setupRecognition(){
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecognition) { state.recognition = null; micBtn.title = 'SpeechRecognition not supported in this browser'; return; }
+  if(!SpeechRecognition){ micBtn.title = 'Speech recognition not supported'; return; }
   const recog = new SpeechRecognition();
-  recog.lang = navigator.language || 'en-US';
-  recog.interimResults = false;
-  recog.maxAlternatives = 1;
-  recog.onresult = (evt)=>{
-    const t = evt.results[0][0].transcript;
-    messageInput.value = (messageInput.value ? messageInput.value + ' ' : '') + t;
-  };
-  recog.onerror = (e)=>{console.warn('recog error',e);};
+  recog.lang = navigator.language || 'en-US'; recog.interimResults = false; recog.maxAlternatives = 1;
+  recog.onresult = (e)=>{ const t = e.results[0][0].transcript; messageInput.value = (messageInput.value ? messageInput.value + ' ' : '') + t; };
+  recog.onend = ()=>{ state.listening = false; micBtn.style.opacity = 1; };
+  recog.onerror = (e)=>{ console.warn('recog error', e); state.listening=false; micBtn.style.opacity = 1; };
   state.recognition = recog;
 }
 
-// ---------- Settings flow ----------
-settingsBtn.onclick = ()=>settingsModal.style.display='flex';
-cancelSettingsBtn.onclick = ()=>settingsModal.style.display='none';
-saveSettingsBtn.onclick = ()=>{
-  state.settings.theme = settingsSelect.value;
-  state.settings.accent = accentColor.value;
-  state.settings.voiceIndex = Number(voiceSelect.value);
-  state.settings.rate = Number(rateInput.value);
-  state.settings.pitch = Number(pitchInput.value);
-  state.settings.voiceOn = (voiceToggle.innerText === 'Voice ON');
-  applySettingsToDOM();
-  saveAll();
-  settingsModal.style.display='none';
-};
+/* ---------------------------
+   Wallet behavior
+   --------------------------- */
+function updateWalletUI(){ qs('walletBalance').innerText = state.wallet.balance; qs('balanceDisplay').innerText = state.wallet.balance; qs('txCount').innerText = (state.wallet.transactions||[]).length; }
 
-// ---------- Wallet ----------
-giveMoneyBtn.onclick = ()=>walletModal.style.display='flex';
-walletBtn.onclick = ()=>walletModal.style.display='flex';
 addFundsBtn.onclick = ()=>{
-  const a = Number(addAmount.value||0);
-  const note = noteInput.value || 'manual';
+  const a = Number(addAmount.value||0); const note = noteInput.value || 'deposit';
   if(isNaN(a) || a<=0) return alert('Enter valid amount');
-  state.wallet.balance += a;
-  state.wallet.transactions.push({time:nowIso(),type:'add',amount:a,note});
-  addAmount.value=''; noteInput.value='';
-  qs('walletBalance').innerText = state.wallet.balance;
-  qs('balanceDisplay').innerText = state.wallet.balance;
-  saveAll();
-  alert('Added funds locally (simulated).');
+  state.wallet.balance += a; state.wallet.transactions.push({time:nowIso(),type:'add',amount:a,note}); addAmount.value=''; noteInput.value=''; updateWalletUI(); saveAll(); alert('Funds added (simulated).');
 };
 giveToAgentBtn.onclick = ()=>{
-  const a = Number(giveAmount.value||0);
-  const action = (giveAction.value || '').trim();
-  if(isNaN(a) || a<=0 || !action) return alert('Enter amount and action.');
+  const a = Number(giveAmount.value||0); const action = (giveAction.value||'').trim();
+  if(isNaN(a) || a<=0 || !action) return alert('Enter amount and action');
   if(state.wallet.balance < a) return alert('Insufficient funds.');
-  state.wallet.balance -= a;
-  state.wallet.transactions.push({time:nowIso(),type:'give',amount:a,action});
+  state.wallet.balance -= a; state.wallet.transactions.push({time:nowIso(),type:'give',amount:a,action}); updateWalletUI(); saveAll();
+  appendMessage('agent', `Received ${a} to "${action}". I will (simulated) ${action}.`);
+  if(state.settings.voiceOn) speakText(`Received ${a} to ${action}.`);
   giveAmount.value=''; giveAction.value='';
-  qs('walletBalance').innerText = state.wallet.balance;
-  qs('balanceDisplay').innerText = state.wallet.balance;
-  saveAll();
-  appendMessage('agent', `Received ${a} to "${action}". I will attempt to ${action} (simulated).`);
-  if(state.settings.voiceOn) speakText(`I received ${a} to ${action}.`);
 };
 
-// ---------- Password gating ----------
+/* ---------------------------
+   Password gating (no demo)
+   --------------------------- */
 pwUnlock.onclick = ()=>{
   const val = pwInput.value.trim();
-  if(val === 'Legend.Backwave.Com' || val === 'demo'){
-    openApp();
-  } else {
-    alert('Incorrect password.');
-  }
+  if(val === 'Legend.Backwave.Com'){ openApp(); } else { alert('Incorrect password'); }
 };
-pwDemo.onclick = ()=>{ openApp(); };
 
-// ---------- Export/Import/Clear ----------
+/* ---------------------------
+   Export / Import / Clear
+   --------------------------- */
 exportBtn.onclick = ()=>{
-  const payload = {
-    chats: state.chats,
-    memory: state.memory,
-    wallet: state.wallet,
-    settings: state.settings
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)],{type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href=url; a.download='backwave-export.json'; a.click();
-  URL.revokeObjectURL(url);
+  const payload = { chats: state.chats, memory: state.memory, wallet: state.wallet, settings: state.settings };
+  const blob = new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='backwave-export.json'; a.click(); URL.revokeObjectURL(url);
 };
 importBtn.onclick = ()=>{
-  const input = document.createElement('input');
-  input.type='file';
-  input.accept='application/json';
-  input.onchange = (e)=>{
-    const f = e.target.files[0]; if(!f) return;
-    const r = new FileReader();
-    r.onload = ()=>{
-      try{
-        const data = JSON.parse(r.result);
-        if(data.chats) state.chats = data.chats;
-        if(data.memory) state.memory = data.memory;
-        if(data.wallet) state.wallet = data.wallet;
-        if(data.settings) state.settings = data.settings;
-        saveAll(); render();
-        alert('Imported.');
-      }catch(err){ alert('Invalid file.'); }
-    };
-    r.readAsText(f);
-  };
-  input.click();
-};
-clearAllBtn.onclick = ()=>{
-  if(!confirm('Clear ALL Backwave data in this browser?')) return;
-  localStorage.removeItem('backwave_chats');
-  localStorage.removeItem('backwave_settings');
-  localStorage.removeItem('backwave_memory');
-  localStorage.removeItem('backwave_wallet');
-  location.reload();
+  const input = document.createElement('input'); input.type='file'; input.accept='application/json';
+  input.onchange = (e)=>{ const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = ()=>{
+      try{ const data = JSON.parse(r.result); if(data.chats) state.chats = data.chats; if(data.memory) state.memory = data.memory; if(data.wallet) state.wallet = data.wallet; if(data.settings) state.settings = data.settings; saveAll(); render(); alert('Imported'); }catch(err){ alert('Invalid file'); } }; r.readAsText(f);
+  }; input.click();
 };
 
-// ---------- Misc UI handlers ----------
-newChatBtn.onclick = newChat;
+/* ---------------------------
+   Small UI & event wiring
+   --------------------------- */
+newChatBtn.onclick = ()=> newChat();
+qs('newChatBtn_side').onclick = ()=> newChat();
+
+qs('settingsBtn_side').onclick = ()=> { settingsModal.style.display='flex'; settingsModal.setAttribute('aria-hidden','false'); setupSettingsModal(); };
+qs('walletBtn_side').onclick = ()=> { walletModal.style.display='flex'; walletModal.setAttribute('aria-hidden','false'); updateWalletUI(); };
+qs('giveMoneyBtn').onclick = ()=> { walletModal.style.display='flex'; walletModal.setAttribute('aria-hidden','false'); updateWalletUI(); };
+
+qs('closeWallet').onclick = ()=> { walletModal.style.display='none'; walletModal.setAttribute('aria-hidden','true'); };
+
+helpBtnRef.onclick = ()=> { helpModal.style.display='flex'; helpModal.setAttribute('aria-hidden','false'); };
+closeHelp.onclick = ()=> { helpModal.style.display='none'; helpModal.setAttribute('aria-hidden','true'); };
+
 sendBtn.onclick = handleSend;
-messageInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); handleSend(); }});
-helpBtn.onclick = ()=>helpModal.style.display='flex';
-closeHelp.onclick = ()=>helpModal.style.display='none';
-qs('closeWallet').onclick = ()=>walletModal.style.display='none';
+messageInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); handleSend(); } });
 
-// mic toggle
 micBtn.onclick = ()=>{
-  if(!state.recognition) return alert('SpeechRecognition not supported in this browser.');
-  if(state.listening){
-    state.recognition.stop();
-    state.listening=false;
-    micBtn.style.background='transparent';
-  } else {
-    try{
-      state.recognition.start();
-      state.listening=true;
-      micBtn.style.background='rgba(0,0,0,0.06)';
-    }catch(e){ console.warn(e); alert('Could not start recognition');}
-  }
+  if(!state.recognition) { alert('SpeechRecognition not supported in this browser'); return; }
+  if(state.listening){ state.recognition.stop(); state.listening = false; micBtn.style.opacity = 1; } else { try{ state.recognition.start(); state.listening = true; micBtn.style.opacity = 0.7; }catch(err){ console.warn(err); } }
 };
 
-// voice toggle
 voiceToggle.onclick = ()=>{
   state.settings.voiceOn = !state.settings.voiceOn;
-  voiceToggle.innerText = state.settings.voiceOn ? 'Voice ON' : 'Voice OFF';
+  updateVoiceIcon();
   saveAll();
 };
+function updateVoiceIcon(){
+  voiceIcon.innerHTML = '';
+  const useId = state.settings.voiceOn ? '#icon-voice-on' : '#icon-voice-off';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 100 100'); svg.setAttribute('width','18'); svg.setAttribute('height','18');
+  const use = document.createElementNS('http://www.w3.org/2000/svg','use'); use.setAttributeNS('http://www.w3.org/1999/xlink','href',useId);
+  svg.appendChild(use); voiceIcon.appendChild(svg);
+}
 
-// when selecting voice in modal, set preview
-voiceSelect.onchange = ()=> {
-  const idx = Number(voiceSelect.value);
-  state.settings.voiceIndex = idx;
-  speakText('This is a preview.');
-};
+newChatSearch.addEventListener('input', (e)=> renderChats(e.target.value) );
 
-// ---------- Boot app ----------
+/* Settings modal internal wiring */
+function setupSettingsModal(){
+  // theme buttons
+  settingsModal.querySelectorAll('button[data-theme-val]').forEach(b=>{
+    b.onclick = ()=>{ state.settings.theme = b.getAttribute('data-theme-val'); document.body.setAttribute('data-theme', state.settings.theme); saveAll(); };
+  });
+  // color swatches
+  settingsModal.querySelectorAll('.swatch').forEach(s=> s.onclick = ()=>{
+    const c = s.getAttribute('data-color'); accentColorInput.value = c; state.settings.accent = c; applyAccent(c); saveAll();
+  });
+  accentColorInput.onchange = ()=>{ const c = accentColorInput.value; state.settings.accent = c; applyAccent(c); saveAll(); };
+  // voice list populate (if already)
+  populateVoices();
+  // settings values
+  rateInput.value = state.settings.rate || 1; pitchInput.value = state.settings.pitch || 1;
+  voiceSelect.value = state.settings.voiceIndex || 0;
+  saveSettingsBtn.onclick = ()=>{
+    state.settings.voiceIndex = Number(voiceSelect.value || 0);
+    state.settings.rate = Number(rateInput.value||1);
+    state.settings.pitch = Number(pitchInput.value||1);
+    state.settings.voiceOn = state.settings.voiceOn !== false;
+    saveAll(); settingsModal.style.display='none';
+  };
+  cancelSettingsBtn.onclick = ()=>{ settingsModal.style.display='none'; };
+}
+
+/* Accent application */
+function applyAccent(c){
+  document.documentElement.style.setProperty('--accent', c);
+  // compute a second accent variant (slightly lighter)
+  function lighten(hex,amt){ const num=parseInt(hex.slice(1),16); let r=(num>>16)+amt; let g=((num>>8)&0x00FF)+amt; let b=(num&0x0000FF)+amt; r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b)); return '#'+(r<<16 | g<<8 | b).toString(16).padStart(6,'0'); }
+  document.documentElement.style.setProperty('--accent-2', lighten(c,24));
+}
+
+/* ---------------------------
+   Open app (after password)
+   --------------------------- */
 function openApp(){
   pwOverlay.style.display='none';
-  appEl.style.display='grid';
-  // ensure at least one chat
-  if(!state.chats || state.chats.length===0) state.chats = DEFAULTS.chats;
-  if(!state.activeChatId) state.activeChatId = state.chats[0].id;
-  // populate voices after they load
+  document.body.setAttribute('data-theme', state.settings.theme || 'dark');
+  applyAccent(state.settings.accent || '#56b3ff');
+  ensureActiveChat();
   populateVoices();
-  if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = populateVoices;
-  }
-  setupRecognition();
   render();
+  setupRecognition();
 }
 
-// ---------- On load init ----------
-window.addEventListener('load', ()=>{
-  applySettingsToDOM();
-  // wire settings modal inputs
-  settingsSelect.value = state.settings.theme;
-  accentColor.value = state.settings.accent || '#6c8cff';
-  rateInput.value = state.settings.rate || 1;
-  pitchInput.value = state.settings.pitch || 1;
-  // attempt to load voices
-  populateVoices();
-  // auto-open if demo mode (for convenience if unlocked)
-  // keep app hidden until password entered
-});
-
-// ---------- small extras: click outside modal to close ----------
-document.querySelectorAll('.modalOverlay').forEach(m=>{
-  m.addEventListener('click', (e)=>{ if(e.target===m){ m.style.display='none'; }});
-});
-
-// ---------- small helper: escape prompt insertion safety -----
-function safePrompt(msg, def=''){ try{ return prompt(msg,def); }catch(e){ return null; }}
-
-// ---------- final: allow chat mode toggles by clicking mode chip ----------
-modeChip.onclick = ()=>{
-  const chat = getActiveChat();
-  if(!chat) return;
-  const modes = ['assistant','creative','concise'];
-  const cur = chat.mode || 'assistant';
-  const idx = (modes.indexOf(cur)+1) % modes.length;
-  chat.mode = modes[idx];
-  render();
-};
-
-// ---------- ready ----------
-console.log('Backwave ready. Save this file as backwave.html and open in a browser.');
-
-// Optional: small sample memory to demonstrate
-if(Object.keys(state.memory).length===0){
-  state.memory['favorite_color'] = 'cerulean';
+/* ---------------------------
+   Render everything
+   --------------------------- */
+function render(){
+  ensureActiveChat();
+  renderChats();
+  renderMessages();
+  updateWalletUI();
+  updateVoiceIcon();
   saveAll();
 }
+
+/* ---------------------------
+   Initialization
+   --------------------------- */
+window.addEventListener('load', ()=>{
+  // ensure defaults if none exist
+  if(!state.chats || state.chats.length===0) state.chats = DEFAULTS.chats;
+  if(!state.settings) state.settings = DEFAULTS.settings;
+  if(!state.memory) state.memory = {};
+  // display pw overlay
+  pwOverlay.style.display = 'flex';
+  // wire export/import buttons (already)
+  // small sample memory if empty
+  if(Object.keys(state.memory).length === 0){
+    state.memory['favorite_color'] = 'cerulean';
+    saveAll();
+  }
+  // apply theme for pw overlay
+  document.body.setAttribute('data-theme', state.settings.theme || 'dark');
+  // populate voices after a short delay for Chrome
+  setTimeout(populateVoices, 200);
+});
+
+/* ---------------------------
+   Extra keyboard shortcuts & UX helpers
+   --------------------------- */
+document.addEventListener('keydown', (e)=>{
+  // Ctrl+K focus search
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); newChatSearch.focus(); }
+  // Escape to close modals
+  if(e.key==='Escape'){
+    document.querySelectorAll('.modalOverlay').forEach(m=>{ if(m.style.display==='flex') m.style.display='none'; });
+  }
+});
+
+/* ---------------------------
+   Accessibility & safety helpers
+   --------------------------- */
+function safePrompt(msg, def=''){ try{ return prompt(msg, def); }catch(e){ return null; }}
+
+/* ---------------------------
+   Keep old hooks for backward compatibility:
+   - callExternalLLM (exists)
+   - agentRespond (exists)
+   - STORAGE keys unchanged
+   --------------------------- */
+
+/* --------------- End of script --------------- */
 </script>
 </body>
 </html>
