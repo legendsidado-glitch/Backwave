@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Backwave — Local AI Agent</title>
+<style>
+  :root{
+    --accent:#6c8cff;
+    --bg:#f5f7fb;
+    --surface:#ffffff;
+    --text:#0f1724;
+    --muted:#5b6b7a;
+    --radius:12px;
+  }
+  [data-theme="dark"]{
+    --bg:#0b1117;
+    --surface:#07101a;
+    --text:#e6eef8;
+    --muted:#9fb0c9;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  body{background:linear-gradient(180deg,var(--bg),#e9f0ff);color:var(--text);display:flex;align-items:stretch}
+  .app{width:100%;max-width:1200px;margin:24px auto;border-radius:14px;padding:0;display:grid;grid-template-columns:280px 1fr;gap:16px}
+  .card{background:var(--surface);border-radius:var(--radius);box-shadow:0 6px 20px rgba(10,20,40,0.08);overflow:hidden}
+  /* Sidebar */
+  .sidebar{padding:14px;display:flex;flex-direction:column;height:80vh}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 10px}
+  .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#3ab0ff);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+  .title{font-weight:700}
+  .chats{margin-top:10px;flex:1;overflow:auto;padding-right:6px}
+  .chatItem{padding:8px 10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer}
+  .chatItem:hover{background:rgba(0,0,0,0.03)}
+  .chatItem.active{background:linear-gradient(90deg,var(--accent),#5aa3ff);color:white}
+  .controls{display:flex;gap:6px;margin-top:8px}
+  button{background:var(--accent);border:none;color:white;padding:8px 10px;border-radius:10px;cursor:pointer}
+  .mutedBtn{background:transparent;border:1px solid rgba(90,120,200,0.12);color:var(--text)}
+  /* Main area */
+  .main{display:flex;flex-direction:column;height:80vh}
+  .topBar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(0,0,0,0.04)}
+  .chatArea{flex:1;padding:16px;overflow:auto}
+  .msg{max-width:75%;padding:10px 12px;border-radius:12px;margin-bottom:8px;line-height:1.35}
+  .msg.user{background:linear-gradient(180deg,#e9f0ff,#dbe9ff);margin-left:auto}
+  .msg.agent{background:#f1f5f9}
+  .composer{display:flex;gap:8px;padding:12px;border-top:1px solid rgba(0,0,0,0.04)}
+  textarea{flex:1;min-height:46px;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,0.06);resize:none}
+  .small{font-size:13px;color:var(--muted)}
+  .modalOverlay{position:fixed;inset:0;background:rgba(5,7,10,0.46);display:flex;align-items:center;justify-content:center;z-index:9999}
+  .modal{background:var(--surface);padding:20px;border-radius:12px;min-width:320px;max-width:720px;box-shadow:0 10px 40px rgba(0,0,0,0.3)}
+  .row{display:flex;gap:8px;align-items:center}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .chip{background:rgba(0,0,0,0.05);padding:6px 8px;border-radius:999px;font-size:13px}
+  input[type="text"],select,input[type="number"]{padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.08)}
+  .wallet{padding:12px}
+  .footerNote{font-size:12px;color:var(--muted);padding:6px 12px}
+  .topControls{display:flex;gap:8px;align-items:center}
+  .tiny{font-size:12px;padding:6px 8px;border-radius:8px}
+  .iconBtn{background:transparent;border:none;padding:6px;border-radius:8px;cursor:pointer}
+  .accentBar{height:6px;background:linear-gradient(90deg,var(--accent),#3ab0ff)}
+  .file{display:none}
+  /* small screens */
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;max-width:960px}
+    .sidebar{display:none}
+  }
+</style>
+</head>
+<body data-theme="light">
+<div id="passwordOverlay" class="modalOverlay">
+  <div class="modal" style="width:360px">
+    <h3>Backwave — Secure Access</h3>
+    <p class="small">Enter the access password to unlock Backwave.</p>
+    <div style="margin-top:8px">
+      <input id="pwInput" type="text" placeholder="Password" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd" />
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+      <button id="pwUnlock">Unlock</button>
+      <button id="pwDemo" class="mutedBtn">Demo (no password)</button>
+    </div>
+    <p class="small" style="margin-top:10px">Hint: the password is <code>Legend.Backwave.Com</code></p>
+  </div>
+</div>
+
+<div id="app" class="app" style="display:none">
+  <div class="card sidebar">
+    <div class="brand">
+      <div class="logo">BW</div>
+      <div>
+        <div class="title">Backwave</div>
+        <div class="small">Local agent prototype</div>
+      </div>
+    </div>
+    <div class="chats card" id="chatsList"></div>
+    <div class="controls">
+      <button id="newChatBtn">New Chat</button>
+      <button id="settingsBtn" class="mutedBtn">Settings</button>
+      <button id="walletBtn" class="mutedBtn">Wallet</button>
+    </div>
+    <div style="margin-top:10px">
+      <div class="small">Quick commands</div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button id="exportBtn" class="tiny mutedBtn">Export</button>
+        <button id="importBtn" class="tiny mutedBtn">Import</button>
+        <button id="clearAllBtn" class="tiny mutedBtn">Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card main">
+    <div class="topBar">
+      <div style="display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-weight:700">Backwave</div>
+          <div id="activeChatName" class="small muted"></div>
+          <div id="modeChip" class="chip small">assistant</div>
+        </div>
+        <div class="small">Chat with Backwave — voice & text. Saved locally.</div>
+      </div>
+      <div class="topControls">
+        <div class="small">Balance: <strong id="balanceDisplay">0</strong> ⸱</div>
+        <button id="giveMoneyBtn" class="mutedBtn tiny">Give Money</button>
+        <button id="voiceToggle" class="mutedBtn tiny">Voice ON</button>
+        <button id="helpBtn" class="mutedBtn tiny">Help</button>
+      </div>
+    </div>
+
+    <div id="chatArea" class="chatArea"></div>
+
+    <div class="composer">
+      <button id="micBtn" class="iconBtn" title="Speak (if supported)">🎤</button>
+      <textarea id="messageInput" placeholder="Type a message, or try commands like: /remember, /spend 10 buy coffee"></textarea>
+      <button id="sendBtn">Send</button>
+    </div>
+    <div class="footerNote">Tip: say "remember X is Y" or use "/remember key=value" to teach Backwave things. Use "/spend AMT action" to instruct spending from wallet.</div>
+  </div>
+</div>
+
+<!-- Settings modal (hidden initially) -->
+<div id="settingsModal" class="modalOverlay" style="display:none">
+  <div class="modal">
+    <h3>Settings</h3>
+    <div class="field">
+      <label class="small">Theme</label>
+      <select id="themeSelect">
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="small">Accent color</label>
+      <input id="accentColor" type="color" value="#6c8cff" />
+    </div>
+    <div class="field">
+      <label class="small">Voice</label>
+      <select id="voiceSelect"></select>
+    </div>
+    <div class="row" style="gap:12px">
+      <div class="field" style="flex:1">
+        <label class="small">Rate</label>
+        <input id="rate" type="number" min="0.5" max="2" step="0.1" value="1" />
+      </div>
+      <div class="field" style="flex:1">
+        <label class="small">Pitch</label>
+        <input id="pitch" type="number" min="0" max="2" step="0.1" value="1" />
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button id="saveSettings">Save</button>
+      <button id="cancelSettings" class="mutedBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Wallet modal -->
+<div id="walletModal" class="modalOverlay" style="display:none">
+  <div class="modal">
+    <h3>Wallet</h3>
+    <div class="wallet">
+      <div class="small">Current balance: <strong id="walletBalance">0</strong></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input id="addAmount" type="number" placeholder="Amount" min="1" />
+        <input id="note" type="text" placeholder="Note (what it's for)" />
+        <button id="addFundsBtn">Add Funds</button>
+      </div>
+      <div style="margin-top:10px">
+        <label class="small">Give money to agent to perform an action:</label>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input id="giveAmount" type="number" placeholder="Amount" min="1" />
+          <input id="giveAction" type="text" placeholder='Action, e.g. "buy logo design"' />
+          <button id="giveToAgentBtn">Give</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button id="closeWallet">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div id="helpModal" class="modalOverlay" style="display:none">
+  <div class="modal">
+    <h3>Backwave — Quick Help</h3>
+    <ul>
+      <li><strong>Remember:</strong> Say "remember X is Y" or use "/remember key=value". Backwave saves it to memory.</li>
+      <li><strong>Spend:</strong> Use "/spend 10 buy art" to instruct spending from wallet (simulated).</li>
+      <li><strong>Chats:</strong> Create multiple chats to separate tasks and personas.</li>
+      <li><strong>Voice:</strong> Toggle voice replies in the top bar, change voice in Settings.</li>
+      <li><strong>External LLM:</strong> There's a hook `callExternalLLM()` in the code where you can plug in an API call.</li>
+    </ul>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button id="closeHelp">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+  Backwave — client-only prototype
+  - Persistent storage keys:
+    backwave_chats, backwave_settings, backwave_memory, backwave_wallet
+  - Password: Legend.Backwave.Com
+  - Hook external LLM by editing callExternalLLM()
+*/
+
+// ---------- Utilities ----------
+const randId = (n=6)=>Math.random().toString(36).slice(2,2+n);
+const nowIso = ()=>new Date().toISOString();
+function qs(id){return document.getElementById(id)}
+
+// ---------- Storage helpers ----------
+const STORAGE = {
+  get(k, def){try{const v=localStorage.getItem(k); return v?JSON.parse(v):def}catch(e){return def}},
+  set(k,v){localStorage.setItem(k,JSON.stringify(v))}
+};
+
+// ---------- Default data ----------
+const DEFAULTS = {
+  chats: [{id:'c-'+randId(),name:'General',messages:[
+    {from:'agent',text:'Hello — I am Backwave. Ask me to remember things or try the wallet (click Wallet).',time:nowIso()}
+  ],mode:'assistant'}],
+  settings: {theme:'light',accent:'#6c8cff',voiceIndex:0,rate:1,pitch:1,voiceOn:true},
+  memory: {}, // key->value map
+  wallet: {balance:0,transactions:[]}
+};
+
+// ---------- App state ----------
+let state = {
+  chats: STORAGE.get('backwave_chats', DEFAULTS.chats),
+  settings: STORAGE.get('backwave_settings', DEFAULTS.settings),
+  memory: STORAGE.get('backwave_memory', DEFAULTS.memory),
+  wallet: STORAGE.get('backwave_wallet', DEFAULTS.wallet),
+  activeChatId: null,
+  voices: [],
+  recognition: null,
+  listening:false
+};
+
+// ---------- DOM references ----------
+const appEl = qs('app');
+const chatsList = qs('chatsList');
+const chatArea = qs('chatArea');
+const messageInput = qs('messageInput');
+const sendBtn = qs('sendBtn');
+const newChatBtn = qs('newChatBtn');
+const settingsBtn = qs('settingsBtn');
+const settingsModal = qs('settingsModal');
+const walletModal = qs('walletModal');
+const settingsSelect = qs('themeSelect');
+const accentColor = qs('accentColor');
+const voiceSelect = qs('voiceSelect');
+const rateInput = qs('rate');
+const pitchInput = qs('pitch');
+const saveSettingsBtn = qs('saveSettings');
+const cancelSettingsBtn = qs('cancelSettings');
+const pwOverlay = qs('passwordOverlay');
+const pwInput = qs('pwInput');
+const pwUnlock = qs('pwUnlock');
+const pwDemo = qs('pwDemo');
+const balanceDisplay = qs('balanceDisplay');
+const walletBalance = qs('walletBalance');
+const addFundsBtn = qs('addFundsBtn');
+const addAmount = qs('addAmount');
+const noteInput = qs('note');
+const giveAmount = qs('giveAmount');
+const giveAction = qs('giveAction');
+const giveToAgentBtn = qs('giveToAgentBtn');
+const giveMoneyBtn = qs('giveMoneyBtn');
+const walletBtn = qs('walletBtn');
+const micBtn = qs('micBtn');
+const voiceToggle = qs('voiceToggle');
+const exportBtn = qs('exportBtn');
+const importBtn = qs('importBtn');
+const clearAllBtn = qs('clearAllBtn');
+const helpBtn = qs('helpBtn');
+const helpModal = qs('helpModal');
+const closeHelp = qs('closeHelp');
+const activeChatName = qs('activeChatName');
+const modeChip = qs('modeChip');
+const settingsVoiceSelect = voiceSelect;
+
+// ---------- Init UI ----------
+function applySettingsToDOM(){
+  document.body.setAttribute('data-theme', state.settings.theme);
+  document.documentElement.style.setProperty('--accent', state.settings.accent);
+  qs('balanceDisplay').innerText = state.wallet.balance;
+  qs('walletBalance').innerText = state.wallet.balance;
+  settingsSelect.value = state.settings.theme;
+  accentColor.value = state.settings.accent || '#6c8cff';
+  rateInput.value = state.settings.rate || 1;
+  pitchInput.value = state.settings.pitch || 1;
+  voiceToggle.innerText = state.settings.voiceOn ? 'Voice ON' : 'Voice OFF';
+}
+function saveAll(){
+  STORAGE.set('backwave_chats', state.chats);
+  STORAGE.set('backwave_settings', state.settings);
+  STORAGE.set('backwave_memory', state.memory);
+  STORAGE.set('backwave_wallet', state.wallet);
+}
+function ensureActiveChat(){
+  if(!state.activeChatId) state.activeChatId = state.chats[0]?.id;
+  if(!state.activeChatId && state.chats.length>0) state.activeChatId = state.chats[0].id;
+}
+function getActiveChat(){ return state.chats.find(c=>c.id===state.activeChatId) || null; }
+
+// ---------- Render ----------
+function renderChats(){
+  chatsList.innerHTML = '';
+  state.chats.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'chatItem' + (c.id===state.activeChatId ? ' active' : '');
+    el.onclick = ()=>{ state.activeChatId=c.id; render(); }
+    el.innerHTML = `<div style="display:flex;flex-direction:column">
+      <div style="font-weight:600">${c.name}</div>
+      <div class="small" style="opacity:0.8">${c.mode || 'assistant'}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end">
+      <div style="font-size:12px;color:var(--muted)">${c.messages.length}</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button title="Rename" class="mutedBtn tiny" onclick="renameChat(event,'${c.id}')">✏️</button>
+        <button title="Delete" class="mutedBtn tiny" onclick="deleteChat(event,'${c.id}')">🗑️</button>
+      </div>
+    </div>`;
+    chatsList.appendChild(el);
+  });
+}
+function renderChatArea(){
+  const chat = getActiveChat();
+  activeChatName.innerText = chat ? ' — ' + chat.name : '';
+  modeChip.innerText = chat?.mode || 'assistant';
+  chatArea.innerHTML = '';
+  if(!chat){
+    chatArea.innerHTML = `<div style="padding:20px">No chat. Create one.</div>`;
+    return;
+  }
+  chat.messages.forEach(m=>{
+    const mEl = document.createElement('div');
+    mEl.className = 'msg ' + (m.from==='user' ? 'user' : 'agent');
+    mEl.innerHTML = `<div style="font-size:13px">${escapeHtml(m.text)}</div>
+      <div class="small" style="margin-top:6px">${new Date(m.time).toLocaleString()}</div>`;
+    chatArea.appendChild(mEl);
+  });
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+function render(){
+  renderChats();
+  renderChatArea();
+  applySettingsToDOM();
+  saveAll();
+}
+
+// ---------- Chat controls ----------
+function newChat(){
+  const id = 'c-'+randId();
+  const newC = {id,name:'Chat '+(state.chats.length+1),messages:[{from:'agent',text:'New chat started. What can I do for you?',time:nowIso()}],mode:'assistant'};
+  state.chats.unshift(newC);
+  state.activeChatId = newC.id;
+  render();
+}
+function renameChat(ev,id){
+  ev.stopPropagation();
+  const newName = prompt('New chat name?') || '';
+  if(!newName) return;
+  const c = state.chats.find(x=>x.id===id);
+  if(c) c.name = newName;
+  render();
+}
+function deleteChat(ev,id){
+  ev.stopPropagation();
+  if(!confirm('Delete this chat?')) return;
+  state.chats = state.chats.filter(x=>x.id!==id);
+  if(state.chats.length===0) newChat();
+  state.activeChatId = state.chats[0].id;
+  render();
+}
+
+// ---------- Message flow & agent ----------
+// Escape for safety display
+function escapeHtml(s){ return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+// Append message to active chat
+function appendMessage(from,text,opts={}){
+  const chat = getActiveChat();
+  if(!chat) return;
+  chat.messages.push({from, text, time: nowIso(), meta: opts});
+  render();
+}
+
+// Very small local "agent" logic.
+// This is where you can add more sophisticated behaviors or integrate an LLM.
+async function agentRespond(userText){
+  // Basic command parsing
+  userText = userText.trim();
+  // commands starting with /
+  if(userText.startsWith('/')){
+    const parts = userText.slice(1).split(' ');
+    const cmd = parts[0].toLowerCase();
+    if(cmd==='remember'){
+      // format: /remember key=value
+      const payload = parts.slice(1).join(' ');
+      const [k,v] = payload.split('=').map(s=>s && s.trim());
+      if(k && v){
+        state.memory[k] = v;
+        saveAll();
+        return `Got it — I will remember ${k} = ${v}.`;
+      } else {
+        return 'Usage: /remember key=value';
+      }
+    } else if(cmd==='spend'){
+      // /spend 10 do something
+      const amt = Number(parts[1] || 0);
+      const action = parts.slice(2).join(' ') || 'an action';
+      if(isNaN(amt) || amt<=0) return 'Invalid amount.';
+      if(state.wallet.balance < amt) return `Insufficient funds. Balance ${state.wallet.balance}.`;
+      state.wallet.balance -= amt;
+      state.wallet.transactions.push({time:nowIso(),type:'spend',amount:amt,action});
+      saveAll();
+      return `Spent ${amt} on "${action}". New balance: ${state.wallet.balance}.`;
+    } else {
+      return `Unknown command: ${cmd}`;
+    }
+  }
+
+  // "remember X is Y" natural language teaching
+  const remMatch = userText.match(/\bremember\s+(.+?)\s+(is|=)\s+(.+)/i);
+  if(remMatch){
+    const key = remMatch[1].trim();
+    const val = remMatch[3].trim();
+    state.memory[key]=val;
+    saveAll();
+    return `Saved "${key}" → "${val}" in memory.`;
+  }
+
+  // simple memory retrieval
+  const askMem = userText.match(/(what|who|tell me).*(about|is)\s+(.+)\?/i);
+  if(askMem){
+    const key = askMem[3].trim();
+    if(state.memory[key]) return `I remember: ${key} = ${state.memory[key]}.`;
+    return `I don't have any memory about "${key}". You can tell me: "remember ${key} is ..."`;
+  }
+
+  // check wallet queries
+  if(/balance|wallet|money/i.test(userText)){
+    return `Current balance: ${state.wallet.balance}. Transactions: ${state.wallet.transactions.length}.`;
+  }
+
+  // Persona-based shorter/longer replies
+  const chat = getActiveChat();
+  const mode = chat?.mode || 'assistant';
+
+  // Hook for external LLM (if you wire one)
+  const external = await callExternalLLM(userText, {mode, memory: state.memory});
+  if(typeof external === 'string'){
+    return external;
+  }
+
+  // Fallback simple local answer
+  if(mode==='creative'){
+    return `🌊 Backwave (creative): I hear you. You said "${userText}". Imagine we turn that into a bright idea — you could try: "${userText} + remix".`;
+  } else if(mode==='concise'){
+    return `Backwave: ${userText.length>120 ? userText.slice(0,120)+'…' : userText}`;
+  } else {
+    // assistant: try to answer nicely using memory snippets
+    // If any memory key matches words in userText, incorporate it.
+    for(const k of Object.keys(state.memory)){
+      if(userText.toLowerCase().includes(k.toLowerCase())){
+        return `You asked about ${k}. I have: ${state.memory[k]}.`;
+      }
+    }
+    // otherwise small helpful echo
+    return `I got: "${userText}". Explain more or use /remember to teach me facts.`;
+  }
+}
+
+// Placeholder — integrate real LLM here if you want.
+// Return a string to be used as the agent reply, or return null to let local fallback run.
+async function callExternalLLM(prompt, opts){
+  // Example stub: if you want to plug in OpenAI, replace this function's body
+  // with a fetch() to your server / openai endpoint and return the assistant text.
+  // Do NOT put API keys directly into client-side code for production.
+  //
+  // Return null to fall back to built-in logic.
+  return null;
+}
+
+// ---------- Send / receive ----------
+async function handleSend(){
+  const text = messageInput.value.trim();
+  if(!text) return;
+  appendMessage('user', text);
+  messageInput.value = '';
+  // show typing...
+  appendMessage('agent', '…'); // temporary placeholder
+  // remove placeholder after response
+  const tmpIndex = getActiveChat().messages.length - 1;
+  const reply = await agentRespond(text);
+  // replace temporary
+  const chat = getActiveChat();
+  if(chat && chat.messages[tmpIndex] && chat.messages[tmpIndex].from==='agent'){
+    chat.messages.splice(tmpIndex,1); // remove placeholder
+  }
+  appendMessage('agent', reply);
+  if(state.settings.voiceOn) speakText(reply);
+  saveAll();
+}
+
+// ---------- Voice synthesis & recognition ----------
+function populateVoices(){
+  state.voices = speechSynthesis.getVoices();
+  voiceSelect.innerHTML = '';
+  state.voices.forEach((v,i)=>{
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.innerText = `${v.name} (${v.lang})${v.default ? ' — default' : ''}`;
+    voiceSelect.appendChild(opt);
+  });
+  if(state.settings.voiceIndex) voiceSelect.value = state.settings.voiceIndex;
+}
+function speakText(text){
+  try{
+    const u = new SpeechSynthesisUtterance(text);
+    const idx = Number(voiceSelect.value || state.settings.voiceIndex || 0);
+    if(state.voices[idx]) u.voice = state.voices[idx];
+    u.rate = Number(rateInput.value || state.settings.rate || 1);
+    u.pitch = Number(pitchInput.value || state.settings.pitch || 1);
+    speechSynthesis.speak(u);
+  }catch(e){
+    console.warn('TTS failed',e);
+  }
+}
+function setupRecognition(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition) { state.recognition = null; micBtn.title = 'SpeechRecognition not supported in this browser'; return; }
+  const recog = new SpeechRecognition();
+  recog.lang = navigator.language || 'en-US';
+  recog.interimResults = false;
+  recog.maxAlternatives = 1;
+  recog.onresult = (evt)=>{
+    const t = evt.results[0][0].transcript;
+    messageInput.value = (messageInput.value ? messageInput.value + ' ' : '') + t;
+  };
+  recog.onerror = (e)=>{console.warn('recog error',e);};
+  state.recognition = recog;
+}
+
+// ---------- Settings flow ----------
+settingsBtn.onclick = ()=>settingsModal.style.display='flex';
+cancelSettingsBtn.onclick = ()=>settingsModal.style.display='none';
+saveSettingsBtn.onclick = ()=>{
+  state.settings.theme = settingsSelect.value;
+  state.settings.accent = accentColor.value;
+  state.settings.voiceIndex = Number(voiceSelect.value);
+  state.settings.rate = Number(rateInput.value);
+  state.settings.pitch = Number(pitchInput.value);
+  state.settings.voiceOn = (voiceToggle.innerText === 'Voice ON');
+  applySettingsToDOM();
+  saveAll();
+  settingsModal.style.display='none';
+};
+
+// ---------- Wallet ----------
+giveMoneyBtn.onclick = ()=>walletModal.style.display='flex';
+walletBtn.onclick = ()=>walletModal.style.display='flex';
+addFundsBtn.onclick = ()=>{
+  const a = Number(addAmount.value||0);
+  const note = noteInput.value || 'manual';
+  if(isNaN(a) || a<=0) return alert('Enter valid amount');
+  state.wallet.balance += a;
+  state.wallet.transactions.push({time:nowIso(),type:'add',amount:a,note});
+  addAmount.value=''; noteInput.value='';
+  qs('walletBalance').innerText = state.wallet.balance;
+  qs('balanceDisplay').innerText = state.wallet.balance;
+  saveAll();
+  alert('Added funds locally (simulated).');
+};
+giveToAgentBtn.onclick = ()=>{
+  const a = Number(giveAmount.value||0);
+  const action = (giveAction.value || '').trim();
+  if(isNaN(a) || a<=0 || !action) return alert('Enter amount and action.');
+  if(state.wallet.balance < a) return alert('Insufficient funds.');
+  state.wallet.balance -= a;
+  state.wallet.transactions.push({time:nowIso(),type:'give',amount:a,action});
+  giveAmount.value=''; giveAction.value='';
+  qs('walletBalance').innerText = state.wallet.balance;
+  qs('balanceDisplay').innerText = state.wallet.balance;
+  saveAll();
+  appendMessage('agent', `Received ${a} to "${action}". I will attempt to ${action} (simulated).`);
+  if(state.settings.voiceOn) speakText(`I received ${a} to ${action}.`);
+};
+
+// ---------- Password gating ----------
+pwUnlock.onclick = ()=>{
+  const val = pwInput.value.trim();
+  if(val === 'Legend.Backwave.Com' || val === 'demo'){
+    openApp();
+  } else {
+    alert('Incorrect password.');
+  }
+};
+pwDemo.onclick = ()=>{ openApp(); };
+
+// ---------- Export/Import/Clear ----------
+exportBtn.onclick = ()=>{
+  const payload = {
+    chats: state.chats,
+    memory: state.memory,
+    wallet: state.wallet,
+    settings: state.settings
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='backwave-export.json'; a.click();
+  URL.revokeObjectURL(url);
+};
+importBtn.onclick = ()=>{
+  const input = document.createElement('input');
+  input.type='file';
+  input.accept='application/json';
+  input.onchange = (e)=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const data = JSON.parse(r.result);
+        if(data.chats) state.chats = data.chats;
+        if(data.memory) state.memory = data.memory;
+        if(data.wallet) state.wallet = data.wallet;
+        if(data.settings) state.settings = data.settings;
+        saveAll(); render();
+        alert('Imported.');
+      }catch(err){ alert('Invalid file.'); }
+    };
+    r.readAsText(f);
+  };
+  input.click();
+};
+clearAllBtn.onclick = ()=>{
+  if(!confirm('Clear ALL Backwave data in this browser?')) return;
+  localStorage.removeItem('backwave_chats');
+  localStorage.removeItem('backwave_settings');
+  localStorage.removeItem('backwave_memory');
+  localStorage.removeItem('backwave_wallet');
+  location.reload();
+};
+
+// ---------- Misc UI handlers ----------
+newChatBtn.onclick = newChat;
+sendBtn.onclick = handleSend;
+messageInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); handleSend(); }});
+helpBtn.onclick = ()=>helpModal.style.display='flex';
+closeHelp.onclick = ()=>helpModal.style.display='none';
+qs('closeWallet').onclick = ()=>walletModal.style.display='none';
+
+// mic toggle
+micBtn.onclick = ()=>{
+  if(!state.recognition) return alert('SpeechRecognition not supported in this browser.');
+  if(state.listening){
+    state.recognition.stop();
+    state.listening=false;
+    micBtn.style.background='transparent';
+  } else {
+    try{
+      state.recognition.start();
+      state.listening=true;
+      micBtn.style.background='rgba(0,0,0,0.06)';
+    }catch(e){ console.warn(e); alert('Could not start recognition');}
+  }
+};
+
+// voice toggle
+voiceToggle.onclick = ()=>{
+  state.settings.voiceOn = !state.settings.voiceOn;
+  voiceToggle.innerText = state.settings.voiceOn ? 'Voice ON' : 'Voice OFF';
+  saveAll();
+};
+
+// when selecting voice in modal, set preview
+voiceSelect.onchange = ()=> {
+  const idx = Number(voiceSelect.value);
+  state.settings.voiceIndex = idx;
+  speakText('This is a preview.');
+};
+
+// ---------- Boot app ----------
+function openApp(){
+  pwOverlay.style.display='none';
+  appEl.style.display='grid';
+  // ensure at least one chat
+  if(!state.chats || state.chats.length===0) state.chats = DEFAULTS.chats;
+  if(!state.activeChatId) state.activeChatId = state.chats[0].id;
+  // populate voices after they load
+  populateVoices();
+  if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = populateVoices;
+  }
+  setupRecognition();
+  render();
+}
+
+// ---------- On load init ----------
+window.addEventListener('load', ()=>{
+  applySettingsToDOM();
+  // wire settings modal inputs
+  settingsSelect.value = state.settings.theme;
+  accentColor.value = state.settings.accent || '#6c8cff';
+  rateInput.value = state.settings.rate || 1;
+  pitchInput.value = state.settings.pitch || 1;
+  // attempt to load voices
+  populateVoices();
+  // auto-open if demo mode (for convenience if unlocked)
+  // keep app hidden until password entered
+});
+
+// ---------- small extras: click outside modal to close ----------
+document.querySelectorAll('.modalOverlay').forEach(m=>{
+  m.addEventListener('click', (e)=>{ if(e.target===m){ m.style.display='none'; }});
+});
+
+// ---------- small helper: escape prompt insertion safety -----
+function safePrompt(msg, def=''){ try{ return prompt(msg,def); }catch(e){ return null; }}
+
+// ---------- final: allow chat mode toggles by clicking mode chip ----------
+modeChip.onclick = ()=>{
+  const chat = getActiveChat();
+  if(!chat) return;
+  const modes = ['assistant','creative','concise'];
+  const cur = chat.mode || 'assistant';
+  const idx = (modes.indexOf(cur)+1) % modes.length;
+  chat.mode = modes[idx];
+  render();
+};
+
+// ---------- ready ----------
+console.log('Backwave ready. Save this file as backwave.html and open in a browser.');
+
+// Optional: small sample memory to demonstrate
+if(Object.keys(state.memory).length===0){
+  state.memory['favorite_color'] = 'cerulean';
+  saveAll();
+}
+</script>
+</body>
+</html>
